@@ -1,0 +1,68 @@
+rule_files:
+  - ./alerts.yml
+
+tests:
+  # Test 1: counter reset simulation, summed
+  # This is equivalent to the the first test in the basic_counter sample, but takes multiple service instances into account
+  - interval: 1m
+    input_series:
+      - series: 'http_requests_total{service="payments-api", pod="payments-service-a", status="500"}'
+        # 0 1 0 0 0 
+        values: 0 1 0x2 
+      - series: 'http_requests_total{service="payments-api", pod="payments-service-b", status="500"}'
+        # 0 0 1 1 0 
+        values: 0x1 1x1 0
+      - series: 'http_requests_total{service="payments-api", pod="payments-service-c", status="500"}'
+        # 0 1 1 1 0
+        values: 0 1x2 0
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: InternalServerErrors
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "There have been internal server errors in the last minutes!"
+      - eval_time: 4m
+        alertname: InternalServerErrors
+  
+  # Test 2: no metrics after the second minute
+  - interval: 1m
+    input_series:
+      - series: 'http_requests_total{service="payments-api", pod="payments-service-a", status="500"}'
+        # `_` means no metric!
+        # 0 1 _ _ _ _ _ _ 1
+        values: 0 1 _x6 1
+      - series: 'http_requests_total{service="payments-api", pod="payments-service-b", status="500"}'
+        # 1 1 _ _ _ _ _ _ _
+        values: 1x1 _x6 0
+      - series: 'http_requests_total{service="payments-api", pod="payments-service-c", status="500"}'
+        # _ _ _ _ _ _ _ _ _
+        # Pod c is basically down or does not export metrics 
+        values: _x9
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: InternalServerErrors
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "There have been internal server errors in the last minutes!"
+      - eval_time: 5m
+        alertname: InternalServerErrors
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "There have been internal server errors in the last minutes!"
+      - eval_time: 7m
+        # It takes 5 minutes from a metric to actually disappear, by default! [Link](https://prometheus.io/docs/prometheus/latest/querying/basics/#staleness)
+        alertname: InternalServerErrors
+      - eval_time: 8m
+        # At minute 8 we have again an error and we expect the alert to fire
+        alertname: InternalServerErrors
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "There have been internal server errors in the last minutes!"

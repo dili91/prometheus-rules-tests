@@ -1,0 +1,9 @@
+groups:
+- name: BasicCounter
+  rules:
+  - alert: InternalServerErrors
+    expr: sum(http_requests_total{service="payments-api", status="500"}) > 0
+    labels:
+      severity: critical
+    annotations:
+      summary: "There have been internal server errors in the last minutes!"

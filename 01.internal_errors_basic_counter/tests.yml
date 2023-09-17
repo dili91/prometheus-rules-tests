@@ -1,0 +1,70 @@
+rule_files:
+  - ./alerts.yml
+
+tests:
+  # Test 1: counter reset simulation
+  # Error is 0 to start, then 1 on the first minute and 0 again on the second minute. Note that counters reset
+  # Does not happen by default. Your instrumented apps should actually reset the counter. Usually, this does 
+  # not represent the reality of things. This is a simplified version of an alert, we should probably compute
+  # error increases instead with the help of the `rate()` function
+  - interval: 1m
+    input_series:
+      - series: 'http_requests_total{service="payments-api", pod="payments-service-a", status="500"}'
+        values: 0 1 0 
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: InternalServerErrors
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              service: payments-api
+              pod: payments-service-a
+              status: 500
+            exp_annotations:
+              summary: "There have been internal server errors in the last minutes!"
+      - eval_time: 2m
+        alertname: InternalServerErrors
+  
+  # Test 2: no metrics after the second minute
+  # This mimics the case when a pod is unavailable, or metrics cannot be scraped for whatever reason
+  - interval: 1m
+    input_series:
+      - series: 'http_requests_total{service="payments-api", pod="payments-service-a", status="500"}'
+        # `_` means no metric!
+        # 0 1 _ _ _ _ _ _ 1
+        values: 0 1 _x6 1
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: InternalServerErrors
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              service: payments-api
+              pod: payments-service-a
+              status: 500
+            exp_annotations:
+              summary: "There have been internal server errors in the last minutes!"
+      - eval_time: 5m
+        alertname: InternalServerErrors
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              service: payments-api
+              pod: payments-service-a
+              status: 500
+            exp_annotations:
+              summary: "There have been internal server errors in the last minutes!"
+      - eval_time: 7m
+        # It takes 5 minutes from a metric to actually disappear, by default! [Link](https://prometheus.io/docs/prometheus/latest/querying/basics/#staleness)
+        alertname: InternalServerErrors
+      - eval_time: 8m
+        # At minute 8 we have again an error and we expect the alert to fire
+        alertname: InternalServerErrors
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              service: payments-api
+              pod: payments-service-a
+              status: 500
+            exp_annotations:
+              summary: "There have been internal server errors in the last minutes!"

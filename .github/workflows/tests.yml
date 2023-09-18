@@ -1,0 +1,16 @@
+name: alert tests
+
+on:
+  push:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout Repo
+      uses: actions/checkout@v3
+    - name: Check alert rules
+      uses: peimanja/promtool-github-actions@master
+      with:
+        promtool_actions_subcommand: 'rules'
+        promtool_actions_files: '**/tests.yml'

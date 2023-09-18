@@ -9,7 +9,7 @@ tests:
   # error increases instead with the help of the `rate()` function
   - interval: 1m
     input_series:
-      - series: 'http_requests_total{service="payments-api", pod="payments-service-a", status="500"}'
+      - series: 'http_requests_total{service="payments-api", status="500"}'
         values: 0 1 0 
     alert_rule_test:
       - eval_time: 1m
@@ -18,7 +18,6 @@ tests:
           - exp_labels:
               severity: critical
               service: payments-api
-              pod: payments-service-a
               status: 500
             exp_annotations:
               summary: "There have been internal server errors in the last minutes!"
@@ -29,7 +28,7 @@ tests:
   # This mimics the case when a pod is unavailable, or metrics cannot be scraped for whatever reason
   - interval: 1m
     input_series:
-      - series: 'http_requests_total{service="payments-api", pod="payments-service-a", status="500"}'
+      - series: 'http_requests_total{service="payments-api", status="500"}'
         # `_` means no metric!
         # 0 1 _ _ _ _ _ _ 1
         values: 0 1 _x6 1
@@ -40,7 +39,6 @@ tests:
           - exp_labels:
               severity: critical
               service: payments-api
-              pod: payments-service-a
               status: 500
             exp_annotations:
               summary: "There have been internal server errors in the last minutes!"
@@ -50,7 +48,6 @@ tests:
           - exp_labels:
               severity: critical
               service: payments-api
-              pod: payments-service-a
               status: 500
             exp_annotations:
               summary: "There have been internal server errors in the last minutes!"
@@ -64,7 +61,6 @@ tests:
           - exp_labels:
               severity: critical
               service: payments-api
-              pod: payments-service-a
               status: 500
             exp_annotations:
               summary: "There have been internal server errors in the last minutes!"

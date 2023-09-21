@@ -1,0 +1,30 @@
+rule_files:
+  - ./alerts.yaml
+
+tests:
+  # Linear growth test
+  - interval: 1m
+    input_series:
+      - series: 'http_requests_total{service="payments-api", pod="payments-service-abcd", status="200"}'
+        # 0 10 20
+        values: 0+10x2
+      - series: 'http_requests_total{service="payments-api", pod="payments-service-abcd", status="401"}'
+        # 0 0 3
+        values: "0x1 3"
+
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: UnauthorizedRequestsSpike
+        exp_alerts:
+      - eval_time: 2m
+        alertname: UnauthorizedRequestsSpike
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "There has been a spike of unauthorized requests in the last 2 minutes!"
+              description: >
+                There has been a spike of unauthorized requests in the last 2 minutes!
+                Current value is 13.04%.
+              runbook_url: "https://your-oncall-docs.com/what-to-check-in-case-of-401-spikes"
+  # Counters reset test

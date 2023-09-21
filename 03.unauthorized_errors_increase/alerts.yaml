@@ -1,0 +1,16 @@
+groups:
+- name: RateMultipleInstances
+  rules:
+  - alert: UnauthorizedRequestsSpike
+    expr: > 
+      sum(rate(http_requests_total{service="payments-api", status="401"}[2m])) /
+      sum(rate(http_requests_total{service="payments-api"}[2m])) 
+      > 0
+    labels:
+      severity: warning
+    annotations:
+      summary: "There has been a spike of unauthorized requests in the last 2 minutes!"
+      description: >
+        There has been a spike of unauthorized requests in the last 2 minutes!
+        Current value is {{ $value | humanizePercentage}}.
+      runbook_url: "https://your-oncall-docs.com/what-to-check-in-case-of-401-spikes"

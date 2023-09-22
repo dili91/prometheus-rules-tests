@@ -2,21 +2,101 @@ rule_files:
   - ./alerts.yaml
 
 tests:
-  # Linear growth test
+  # Linear growth test:
+  # 2 minutes of requests growth without errors, then a first spike of errors at minute 2,
+  # and then another one starting at minute 4 
   - interval: 1m
     input_series:
       - series: 'http_requests_total{service="payments-api", pod="payments-service-abcd", status="200"}'
-        # 0 10 20
-        values: 0+10x2
+        # 0 10 20 50 100 150
+        values: 0+10x2 50+50x2
       - series: 'http_requests_total{service="payments-api", pod="payments-service-abcd", status="401"}'
-        # 0 0 3
-        values: "0x1 3"
-
+        # 0 0 3 3 20 20
+        values: 0x1 3x1 20x2
     alert_rule_test:
-      - eval_time: 0m
+      - eval_time: 1m # Note that 1m represents the second data point in the time series (10 requests, 0 401)
         alertname: UnauthorizedRequestsSpike
+        # At minute 1, there haven't bee 401 errors yet. So we do not expect alerts.
         exp_alerts:
       - eval_time: 2m
+        alertname: UnauthorizedRequestsSpike
+        # At minute 2, we have a total of 23 requests, of which 3 are 401s, so the ratio is 13.04%.
+        # as the time series start with 0 requests, this represents the actual rate computed by Prometheus.
+        # Hence we expect a meaningful alert!
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "There has been a spike of unauthorized requests in the last 2 minutes!"
+              description: >
+                There has been a spike of unauthorized requests in the last 2 minutes!
+                Current value is 13.04%.
+              runbook_url: "https://your-oncall-docs.com/what-to-check-in-case-of-401-spikes"
+      - eval_time: 3m
+        alertname: UnauthorizedRequestsSpike
+        # At minute 3, the instant values are 50 requests and 3 unauthorized errors. That said, since our rate function's
+        # window is 2m, the actual values considered are 3-0=3 401 errors and a total of
+        # 50-10-+3 = 43 requests. As the ratio is below our threshold, no alerts are expected this time.
+        exp_alerts:
+      - eval_time: 5m
+        alertname: UnauthorizedRequestsSpike
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "There has been a spike of unauthorized requests in the last 2 minutes!"
+              description: >
+                There has been a spike of unauthorized requests in the last 2 minutes!
+                Current value is 14.53%.
+              runbook_url: "https://your-oncall-docs.com/what-to-check-in-case-of-401-spikes"
+  
+  # Extrapolation and counters reset test:
+  # spike of errors at minute 0, then counter reset. finally another spike at minute 3
+  - interval: 1m
+    input_series:
+      - series: 'http_requests_total{service="payments-api", pod="payments-service-abcd", status="200"}'
+        # 10 20 30 0 10
+        values: 10+10x2 0 10
+      - series: 'http_requests_total{service="payments-api", pod="payments-service-abcd", status="401"}'
+        # 2 5 0 0 20
+        values: 2 5 0x1 20 
+    alert_rule_test:
+      - eval_time: 0m
+        # Perhaps unexpectedly, the rate function works if there are at least 2 samples! 
+        # There's no sample before the first of the series, hence the alert won't fire even 
+        # if we probably would expect so. This might be a non negligible aspect to consider 
+        # for services having low traffic or frequent resets and there's no initialization
+        # to 0 for counters
+        alertname: UnauthorizedRequestsSpike
+        exp_alerts:
+      - eval_time: 1m
+        # At minute 1, the increase of errors over the last 2 minutes is 5, and the total
+        # increase of requests is 25. At the start of the 2m window we do not have scraped 
+        # values yet and Prometheus applies some extrapolation mechanism to compute the most 
+        # sensible value! It takes the increase computed between the last 2 scrapes (minute 
+        # 0 and 1) and use that to calculate what the scraped value would be at the start of
+        # the window, *cutting of at 0 values in worst cases*! As there's a 10 value increase
+        # between minutes 0 and 1 for 200s, a value of 0 for 200 requests is considered at 
+        # the start of the 2m window. Similarly, a value of -1 would be computed for 401s at the
+        # start of the window, but the cutoff mechanism set it to 0. Therefore, the actual compute
+        # rate of increase is 20-0 for 200s and 5-0 for 401s, which makes a 5/(5+20) = 20% increase
+        # of 401s over the total of requests over the last 2 minutes. An alert is therefore expected!
+        alertname: UnauthorizedRequestsSpike
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "There has been a spike of unauthorized requests in the last 2 minutes!"
+              description: >
+                There has been a spike of unauthorized requests in the last 2 minutes!
+                Current value is 20%.
+              runbook_url: "https://your-oncall-docs.com/what-to-check-in-case-of-401-spikes"
+      - eval_time: 2m
+        # At minute 2 Prometheus counter reset behavior kicks in for 401 metrics: it is assumed 
+        # that there's no change compared to the latest sample before the last evaluation, so the
+        # considered counter value for 401 errors at minute 2 is 5 again, and therefore the computed 
+        # increase of the 2m window for unauthenticated errors is 3. Hence the rate of errors is
+        # 100 * 3/(3 + 30-10) = 13.04%
         alertname: UnauthorizedRequestsSpike
         exp_alerts:
           - exp_labels:
@@ -27,4 +107,9 @@ tests:
                 There has been a spike of unauthorized requests in the last 2 minutes!
                 Current value is 13.04%.
               runbook_url: "https://your-oncall-docs.com/what-to-check-in-case-of-401-spikes"
-  # Counters reset test
+      - eval_time: 3m
+        # Finally at minute 3, because of the same counter reset logic the adjusted value for 401 error
+        # is 5 again, and because of that the increase of 401 errors over the last 2 minutes is 0. Therefore
+        # no alerts are expected!
+        alertname: UnauthorizedRequestsSpike
+        exp_alerts:

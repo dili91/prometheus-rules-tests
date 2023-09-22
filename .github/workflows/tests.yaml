@@ -13,4 +13,4 @@ jobs:
       uses: peimanja/promtool-github-actions@master
       with:
         promtool_actions_subcommand: 'rules'
-        promtool_actions_files: '**/tests.yml'
+        promtool_actions_files: '**/tests.yaml'

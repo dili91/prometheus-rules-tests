@@ -1,5 +1,5 @@
 rule_files:
-  - ./alerts.yml
+  - ./alerts.yaml
 
 tests:
   # Test 1: counter reset simulation
@@ -30,7 +30,7 @@ tests:
     input_series:
       - series: 'http_requests_total{service="payments-api", status="500"}'
         # `_` means no metric!
-        # 0 1 _ _ _ _ _ _ 1
+        # 0 1 _ _ _ _ _ _ _ 1
         values: 0 1 _x6 1
     alert_rule_test:
       - eval_time: 1m

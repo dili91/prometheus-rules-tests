@@ -1,0 +1,45 @@
+rule_files:
+  - ./alerts.yaml
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'http_server_sli_total{service="payments-api", pod="payments-service-abcd", operation="CreatePayment", sli_error_type=""}'
+        # 50 100 150 200 250 300
+        values: 50+50x5
+      - series: 'http_server_sli_total{service="payments-api", pod="payments-service-abcd", operation="CreatePayment", sli_error_type="invalid_request_error"}'
+        # 0 10 20 30 40 50
+        values: 0 10+10x4
+      - series: 'http_server_sli_total{service="payments-api", pod="payments-service-abcd", operation="CreatePayment", sli_error_type="internal_dependency_error"}'
+        # 0 0 15 30 45 0
+        values: 0x1 15+15x2 0
+      - series: 'http_server_sli_total{service="payments-api", pod="payments-service-abcd", operation="CreatePayment", sli_error_type="external_dependency_error"}'
+        # 0 0 10 10 0 0
+        values: 0x1 10x1 0x1
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: LowInternalAvailability
+        # At minute 1, only 2 invalid request errors are thrown and our availability scores 100%. No alerts expected
+        exp_alerts:
+      - eval_time: 2m
+        alertname: LowInternalAvailability
+        # Things start to change at minute 2, were we observe 10 internal_dependency_error. Our computed availability is 100/(100+15)=86.96%
+        # That said it's the first time that we do no meet our SLO, there we do not alert yet! 
+        exp_alerts:
+      - eval_time: 3m
+        alertname: LowInternalAvailability
+        # Availability is below standard but the 2 minutes duration is not found yet. No alerts
+        exp_alerts:
+      - eval_time: 4m
+        alertname: LowInternalAvailability
+        # Alerts are expected here! At minute 4, the computed availability is 100/(100+30)=76.92% 
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              operation: CreatePayment
+            exp_annotations:
+              summary: "payments-api has had a low internal availability for the operation CreatePayment in the last 3 minutes!"
+              description: >
+                payments-api has had a low internal availability for the operation CreatePayment in the last 3 minutes!
+                Current value is 76.92%.
+              runbook_url: "https://your-oncall-docs.com/low-avaiability"

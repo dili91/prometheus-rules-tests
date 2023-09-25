@@ -31,13 +31,13 @@ tests:
     input_series:
       - series: 'http_requests_total{service="payments-api", pod="payments-service-a", status="500"}'
         # `_` means no metric!
-        # 0 1 _ _ _ _ _ _ _ 1
+        # 0 1 _ _ _ _ _ _ 1
         values: 0 1 _x6 1
       - series: 'http_requests_total{service="payments-api", pod="payments-service-b", status="500"}'
-        # 1 1 _ _ _ _ _ _ _
+        # 1 1 _ _ _ _ _ _ 0
         values: 1x1 _x6 0
       - series: 'http_requests_total{service="payments-api", pod="payments-service-c", status="500"}'
-        # _ _ _ _ _ _ _ _ _ _
+        # _ _ _ _ _ _ _ _ _
         # Pod c is basically down or does not export metrics 
         values: _x9
     alert_rule_test:

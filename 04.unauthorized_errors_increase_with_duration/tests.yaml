@@ -1,0 +1,53 @@
+rule_files:
+  - ./alerts.yaml
+
+tests:
+  # No errors during the first 2 minutes, then high rates of unauthorized requests for 10 minutes 
+  - interval: 1m
+    input_series:
+      - series: 'http_requests_total{service="payments-api", pod="payments-service-abcd", status="200"}'
+        # 0 10 20 50 100 150 200 250 300 350 400
+        values: 0+10x2 50+50x7
+      - series: 'http_requests_total{service="payments-api", pod="payments-service-abcd", status="401"}'
+        # 0 0 15 30 45 60 75 90 0 0 0
+        values: 0x1 15+15x5 0x2
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: UnauthorizedRequestsSpikeWithDuration
+        # At minute 1, there haven't bee 401 errors yet. So we do not expect alerts.
+        exp_alerts:
+      - eval_time: 5m
+        alertname: UnauthorizedRequestsSpikeWithDuration
+        # At minute 5, the computed 401 increase over the request total is >20%, but the increase of error 
+        # only started 3 minutes before, so no alerts are expected
+        exp_alerts:
+      - eval_time: 7m
+        alertname: UnauthorizedRequestsSpikeWithDuration
+        # At minute 7, we have the same increase computed as minute 5 but this time the alert is on since 5 minutes, 
+        # Therefore we actually expect an alert!
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "There has been a spike of unauthorized requests in the last 5 minutes!"
+              description: >
+                There has been a spike of unauthorized requests in the last 5 minutes!
+                Current value is 23.08%.
+              runbook_url: "https://your-oncall-docs.com/what-to-check-in-case-of-401-spikes"
+      - eval_time: 8m
+        alertname: UnauthorizedRequestsSpikeWithDuration
+        # At minute 8, errors are decreasing but we still expect an alert
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "There has been a spike of unauthorized requests in the last 5 minutes!"
+              description: >
+                There has been a spike of unauthorized requests in the last 5 minutes!
+                Current value is 13.04%.
+              runbook_url: "https://your-oncall-docs.com/what-to-check-in-case-of-401-spikes"
+      - eval_time: 9m
+        alertname: UnauthorizedRequestsSpikeWithDuration
+        # At minute 9, the rate of errors over the last 2m window interval is 0, so 
+        # no alerts are expected
+        exp_alerts:

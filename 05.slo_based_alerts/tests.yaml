@@ -38,8 +38,8 @@ tests:
               severity: critical
               operation: CreatePayment
             exp_annotations:
-              summary: "payments-api has had a low internal availability for the operation CreatePayment in the last 3 minutes!"
+              summary: "payments-api has had a low internal availability for the operation CreatePayment in the last 2 minutes!"
               description: >
-                payments-api has had a low internal availability for the operation CreatePayment in the last 3 minutes!
+                payments-api has had a low internal availability for the operation CreatePayment in the last 2 minutes!
                 Current value is 76.92%.
               runbook_url: "https://your-oncall-docs.com/low-avaiability"

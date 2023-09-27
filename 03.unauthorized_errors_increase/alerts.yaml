@@ -15,7 +15,3 @@ groups:
         There has been a spike of unauthorized requests in the last 2 minutes!
         Current value is {{ $value | humanizePercentage }}.
       runbook_url: "https://your-oncall-docs.com/what-to-check-in-case-of-401-spikes"
-    
-    # Basically same as the above one, with an additional duration condition
-  - alert: UnauthorizedRequestsSpikeWithDuration
-    # Alert if there's a spike of 401 errors > 10% and it lasts for 5 minutes at least

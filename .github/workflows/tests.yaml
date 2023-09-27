@@ -10,7 +10,7 @@ jobs:
     - name: Checkout Repo
       uses: actions/checkout@v3
     - name: Check alert rules
-      uses: peimanja/promtool-github-actions@master
+      uses: beatlabs/promtool-github-action@v0.0.2
       with:
-        promtool_actions_subcommand: 'rules'
-        promtool_actions_files: '**/tests.yaml'
+        cmd: 'test'
+        files: '**/tests.yaml'

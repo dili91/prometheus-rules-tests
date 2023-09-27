@@ -41,5 +41,5 @@ tests:
               summary: "payments-api has had a low internal availability for the operation CreatePayment in the last 2 minutes!"
               description: >
                 payments-api has had a low internal availability for the operation CreatePayment in the last 2 minutes!
-                Current value is 76.92%.
+                Current value is 76.93%.
               runbook_url: "https://your-oncall-docs.com/low-avaiability"

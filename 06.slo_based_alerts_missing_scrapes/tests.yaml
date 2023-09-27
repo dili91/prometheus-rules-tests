@@ -1,0 +1,64 @@
+rule_files:
+  - ./alerts.yaml
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'http_server_sli_total{service="payments-api", pod="payments-service-abcd", operation="CreatePayment", sli_error_type=""}'
+        # _ _ _ 1 4 7 10 13 16
+        values: _x3 1+3x5
+      - series: 'http_server_sli_total{service="payments-api", pod="payments-service-abcd", operation="CreatePayment", sli_error_type="invalid_request_error"}'
+        # _ _ _ _ _ 1 1 1 0 0 
+        values: _x5 1x2 0x1
+      - series: 'http_server_sli_total{service="payments-api", pod="payments-service-abcd", operation="CreatePayment", sli_error_type="internal_dependency_error"}'
+        # _ _ _ 1 2 _ _ _ _ _ 
+        values: _x3 1+1x1 _x5
+      - series: 'http_server_sli_total{service="payments-api", pod="payments-service-abcd", operation="CreatePayment", sli_error_type="external_dependency_error"}'
+        # _ _ _ _ _ _ _ _ _ _ 
+        values: _x10
+    promql_expr_test:
+      - expr: > 
+          sum by(operation) (rate(http_server_sli_total{service="payments-api", sli_error_type=""}[2m])) /
+          sum by(operation) (rate(http_server_sli_total{service="payments-api", sli_error_type!~"invalid_request_error|external_dependency_error"}[2m]))
+        eval_time: 3m
+        exp_samples:
+          # we do not expect any value here!
+      - expr: > 
+          sum by(operation) (rate(http_server_sli_total{service="payments-api", sli_error_type=""}[2m])) /
+          sum by(operation) (rate(http_server_sli_total{service="payments-api", sli_error_type!~"invalid_request_error|external_dependency_error"}[2m]))
+        eval_time: 4m
+        exp_samples:
+          - value: 0.6666666666666666
+            labels: '{operation="CreatePayment"}'
+      - expr: > 
+          sum by(operation) (rate(http_server_sli_total{service="payments-api", sli_error_type=""}[2m])) /
+          sum by(operation) (rate(http_server_sli_total{service="payments-api", sli_error_type!~"invalid_request_error|external_dependency_error"}[2m]))
+        eval_time: 5m
+        exp_samples:
+          - value: 0.75
+            labels: '{operation="CreatePayment"}'
+      - expr: > 
+          sum by(operation) (rate(http_server_sli_total{service="payments-api", sli_error_type=""}[2m])) /
+          sum by(operation) (rate(http_server_sli_total{service="payments-api", sli_error_type!~"invalid_request_error|external_dependency_error"}[2m]))
+        eval_time: 6m
+        exp_samples:
+          - value: 1
+            labels: '{operation="CreatePayment"}'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: LowInternalAvailability
+        exp_alerts:
+        # No errors nor request at this stage. No alerts expected
+      - eval_time: 5m
+        alertname: LowInternalAvailability
+        # Availability is below standard but the 2 minutes duration
+        # threshold is not passed reached yet. No alerts expected
+        exp_alerts:
+      - eval_time: 6m
+        alertname: LowInternalAvailability
+        exp_alerts:
+        # In order for a metric to disappear from Prometheus we need 
+        # at least 5 missing scrapes. Therefore the same value as minute 5 
+        # is considered for internal errors, hence no increase is found.
+        # At the same time successful requests are growing so the availability
+        # goes back to 100%. No alerts expected!

@@ -1,0 +1,18 @@
+groups:
+- name: RateMultipleInstances
+  rules:
+  - alert: LowInternalAvailability
+    # Alert if we're not meeting our SLO of 99.9% availability
+    expr: > 
+      sum by(operation) (rate(http_server_sli_total{service="payments-api", sli_error_type=""}[2m])) /
+      sum by(operation) (rate(http_server_sli_total{service="payments-api", sli_error_type!~"invalid_request_error|external_dependency_error"}[2m])) 
+      < 0.999
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "payments-api has had a low internal availability for the operation {{ $labels.operation}} in the last 2 minutes!"
+      description: >
+        payments-api has had a low internal availability for the operation {{ $labels.operation}} in the last 2 minutes!
+        Current value is {{ $value | humanizePercentage }}.
+      runbook_url: "https://your-oncall-docs.com/low-avaiability"

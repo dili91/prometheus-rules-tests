@@ -62,6 +62,7 @@ tests:
     input_series:
       # We simulate to different series of metrics produced by different pods  
       - series: 'amqp_messages_ready{vhost="payments", queue="notifications.deadletter", pod="abcd"}'
+        # 10 hours is 600 minutes...
         values: '1x600 1x1'
       - series: 'amqp_messages_ready{vhost="payments", queue="notifications.deadletter", pod="efgh"}'
         values: '0x600 0x1'

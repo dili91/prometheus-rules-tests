@@ -1,0 +1,33 @@
+groups:
+- name: MaxCountersInOffHours
+  rules:
+  - alert: DeadLetteredMessagesInHours
+    annotations:
+      summary: "{{ $labels.queue }} has {{ $value }} dead-lettered messages"
+      description: |
+        There are {{ $value }} dead-lettered messages on the `{{ $labels.queue }}` queue in the `{{ $labels.vhost }}` virtual host.
+      runbook_url: "https://your-oncall-docs.com/dead-lettered-messages"
+    # During in-hours shifts (Monday to Friday from 10AM UTC to 4:59PM UTC) we want a noisy
+    # policy for alerts: even one single message in DLQ for at least 2 minutes should page us
+    expr: |
+      max(amqp_messages_ready{vhost="payments", queue="notifications.deadletter"}) by (queue, vhost) > 0
+      and on() ((hour() >= 10 < 17) and (day_of_week() >= 1 < 6))
+    for: 2m
+    labels:
+      severity: critical
+
+  - alert: DeadLetteredMessagesOffHours
+    annotations:
+      summary: "{{ $labels.queue }} has {{ $value }} dead-lettered messages"
+      description: |
+        There are {{ $value }} dead-lettered messages on the `{{ $labels.queue }}` queue in the `{{ $labels.vhost }}` virtual host.
+      runbook_url: "https://your-oncall-docs.com/dead-lettered-messages"
+    # During off-hours shifts (Monday to Friday before 10AM and from 5PM, and at every 
+    # hour during the weekend) we want a more relaxed policy: we should only page the on-caller
+    # if the number of dead-lettered messages is greater than 3.
+    expr: |
+      max(amqp_messages_ready{vhost="payments", queue="notifications.deadletter"}) by (queue, vhost) > 3
+      and on() (((hour() >= 17 or hour() < 10) and (day_of_week() >= 1 < 6)) or (day_of_week() == 0 or day_of_week() >= 6))
+    for: 2m
+    labels:
+      severity: critical

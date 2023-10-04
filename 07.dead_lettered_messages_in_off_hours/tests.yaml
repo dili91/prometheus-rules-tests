@@ -1,0 +1,123 @@
+rule_files:
+  - ./alerts.yaml
+
+tests:
+  # Off-hours test
+  - interval: 1m
+    input_series:
+      # We simulate to different series of metrics produced by different pods  
+      - series: 'amqp_messages_ready{vhost="payments", queue="notifications.deadletter", pod="abcd"}'
+        values: '10x3'
+      - series: 'amqp_messages_ready{vhost="payments", queue="notifications.deadletter", pod="efgh"}'
+        values: '0x3'
+    promql_expr_test:
+      - expr: hour()
+        # Note that the eval_time value is relative to midnight UTC and the current week day.
+        eval_time: 3m
+        exp_samples:
+          # At minute 3 of the day the computed value for hour() should be 0
+          - value: 0
+      - expr: amqp_messages_ready{vhost="payments", queue="notifications.deadletter", pod="abcd"}
+        eval_time: 3m
+        exp_samples:
+          - value: 10
+            labels: amqp_messages_ready{vhost="payments", queue="notifications.deadletter", pod="abcd"}
+      - expr: amqp_messages_ready{vhost="payments", queue="notifications.deadletter", pod="efgh"}
+        eval_time: 3m
+        exp_samples:
+          - value: 0
+            labels: amqp_messages_ready{vhost="payments", queue="notifications.deadletter", pod="efgh"}
+      - expr: max(amqp_messages_ready{vhost="payments", queue="notifications.deadletter"}) by (queue, vhost)
+        eval_time: 3m
+        exp_samples:
+          - value: 10
+            # Note the effect of aggregating on labels
+            labels: '{vhost="payments", queue="notifications.deadletter"}'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: DeadLetteredMessagesOffHours
+        exp_alerts:
+        # No errors are expected at this stage. The alert condition changed to true just now
+      - eval_time: 2m
+        alertname: DeadLetteredMessagesOffHours
+        exp_alerts:
+        # The alert condition has been true on 2 consecutive minutes, 
+        # so an alert is now expected!
+          - exp_labels:
+              severity: critical
+              queue: notifications.deadletter
+              vhost: payments
+            exp_annotations:
+              summary: "notifications.deadletter has 10 dead-lettered messages"
+              description: >
+                There are 10 dead-lettered messages on the `notifications.deadletter` queue in the `payments` virtual host.
+              runbook_url: "https://your-oncall-docs.com/dead-lettered-messages"
+      - eval_time: 2m
+        alertname: DeadLetteredMessagesInHours
+        exp_alerts:
+        # we do not expect alerts from the in-hours policy as the defined shift starts at 10AM UTC
+  
+  # In-hours test
+  - interval: 1m
+    input_series:
+      # We simulate to different series of metrics produced by different pods  
+      - series: 'amqp_messages_ready{vhost="payments", queue="notifications.deadletter", pod="abcd"}'
+        values: '1x600 1x1'
+      - series: 'amqp_messages_ready{vhost="payments", queue="notifications.deadletter", pod="efgh"}'
+        values: '0x600 0x1'
+    promql_expr_test:
+      - expr: hour()
+        # Note that the eval_time value is relative to midnight UTC and the current week day.
+        eval_time: 9h59m
+        exp_samples:
+          # After 9 hours and 59 minutes we expect the hour() value to be 9
+          - value: 9
+      - expr: hour()
+        # Note that the eval_time value is relative to midnight UTC and the current week day.
+        eval_time: 10h
+        exp_samples:
+          # At exactly 10 hour after midnight we expect hour to be 10
+          - value: 10
+      - expr: amqp_messages_ready{vhost="payments", queue="notifications.deadletter", pod="abcd"}
+        eval_time: 10h1m
+        exp_samples:
+          - value: 1
+            labels: amqp_messages_ready{vhost="payments", queue="notifications.deadletter", pod="abcd"}
+      - expr: amqp_messages_ready{vhost="payments", queue="notifications.deadletter", pod="efgh"}
+        eval_time: 10h1m
+        exp_samples:
+          - value: 0
+            labels: amqp_messages_ready{vhost="payments", queue="notifications.deadletter", pod="efgh"}
+      - expr: max(amqp_messages_ready{vhost="payments", queue="notifications.deadletter"}) by (queue, vhost)
+        eval_time: 10h0m
+        exp_samples:
+          - value: 1
+            # Note the effect of aggregating on labels
+            labels: '{vhost="payments", queue="notifications.deadletter"}'
+    alert_rule_test:
+      - eval_time: 10h
+        alertname: DeadLetteredMessagesInHours
+        exp_alerts:
+        # No errors are expected at this stage. The alert condition changed to true just now (because of the hour change)
+      - eval_time: 10h1m
+        alertname: DeadLetteredMessagesInHours
+        exp_alerts:
+        # Same as the above one, our alert condition has not been true for 2 minutes (yet)
+      - eval_time: 10h2m
+        alertname: DeadLetteredMessagesInHours
+        exp_alerts:
+        # The alert condition has been true on 2 consecutive minutes, 
+        # so an alert is now expected!
+          - exp_labels:
+              severity: critical
+              queue: notifications.deadletter
+              vhost: payments
+            exp_annotations:
+              summary: "notifications.deadletter has 1 dead-lettered messages"
+              description: >
+                There are 1 dead-lettered messages on the `notifications.deadletter` queue in the `payments` virtual host.
+              runbook_url: "https://your-oncall-docs.com/dead-lettered-messages"
+      - eval_time: 10h2m
+        alertname: DeadLetteredMessagesOffHours
+        exp_alerts:
+        # we do not expect alerts from the off-hours policy as the defined shift starts at 10AM UTC

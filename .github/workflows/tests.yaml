@@ -10,7 +10,8 @@ jobs:
     - name: Checkout Repo
       uses: actions/checkout@v3
     - name: Check alert rules
-      uses: beatlabs/promtool-github-action@v0.0.2
+      uses: addnab/docker-run-action@v3
       with:
-        cmd: 'test'
-        files: '**/tests.yaml'
+        image: prom/prometheus:v2.47.1
+        options: -v ${{ github.workspace }}:/tmp/tests
+        run: promtool test rules /tmp/tests/**/tests.yaml

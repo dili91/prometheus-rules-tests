@@ -1,0 +1,14 @@
+groups:
+- name: SumRate
+  rules:
+  - alert: TransactionSettlementNoOutboundSettledProcessed
+    annotations:
+      summary: "No `settled` events have been received for **outbound** transactions in the last 3 minutes"
+      description: | 
+        No `settled` events have been received for **outbound** transactions in the last 3 minutes for `{{ $labels.provider }}`.
+      runbook_url: "https://your-oncall-docs.com/dead-lettered-messages"
+    expr: |
+      sum by (provider) (rate(settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider!="banking_circle"}[3m])) == 0
+    for: 2m
+    labels:
+      severity: critical

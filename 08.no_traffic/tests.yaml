@@ -1,0 +1,91 @@
+rule_files:
+  - ./alerts.yaml
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}'
+        # remember that axb is a shorthand for a+0xb, so it's a four times.
+        # _xb is _ b times, as you cannot increment missing scrapes 
+        # remember that _ becomes effective after five consecutive _ 
+        # 1 1 1 _ _ _ _ _ _ 1 4 7 10  
+        values: '1x2 _x6 1+3x3'
+    promql_expr_test:
+      - expr: 'settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}'
+        eval_time: 0m
+        exp_samples:
+          - value: 1
+            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+        eval_time: 1m
+        exp_samples:
+          - value: 1
+            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+        eval_time: 2m
+        exp_samples:
+          - value: 1
+            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+        eval_time: 3m
+        #at minute 3, the value is still 1 because _ is not effective yet. we need 5 consecutive _ to make it effective
+        exp_samples:
+          - value: 1
+            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+        eval_time: 5m
+        #at minute 3, the value is still 1 because _ is not effective yet. we need 5 consecutive _ to make it effective
+        exp_samples:
+          - value: 1
+            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+      - expr: 'sum by (provider) (rate(settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers"}[1m]))'
+        eval_time: 3m
+        exp_samples:
+          - value: 1
+            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+      - expr: 'sum by (provider) (rate(settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers"}[3m]))'
+        eval_time: 5m
+        exp_samples:
+          - value: 1
+            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+        eval_time: 7m
+        #at minute 7, the value is still 1 because _ is not effective yet. we need 5 consecutive _ to make it effective
+        exp_samples:
+          - value: 1
+            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+        eval_time: 8m
+        exp_samples: []
+      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+        eval_time: 9m
+        exp_samples:
+          - value: 1
+            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+        eval_time: 12m
+        exp_samples:
+          - value: 10
+            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+
+    # alert_rule_test:
+    #   - eval_time: 0m
+    #     alertname: TransactionSettlementNoOutboundSettledProcessed
+    #     exp_alerts:
+    #     # No errors are expected at this stage. we can see some traffic
+    #   - eval_time: 2m
+    #     alertname: TransactionSettlementNoOutboundSettledProcessed
+    #     exp_alerts:
+    #     # No errors are expected at this stage. we can see some traffic
+    #   - eval_time: 7m
+    #     alertname: TransactionSettlementNoOutboundSettledProcessed
+    #     exp_alerts:
+    #     # No errors are expected at this stage. we can see some traffic
+    #   - eval_time: 8m
+    #     alertname: TransactionSettlementNoOutboundSettledProcessed
+    #     exp_alerts:
+    #     # No errors are expected at this stage. we can see some traffic
+    #   - eval_time: 11m
+    #     alertname: TransactionSettlementNoOutboundSettledProcessed
+    #     exp_alerts:
+    #     # No errors are expected at this stage. we can see some traffic

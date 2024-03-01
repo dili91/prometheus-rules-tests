@@ -1,91 +1,164 @@
+# Note: this alerts leverages a latency bucket to understand whether there's traffic or not. Usually a counter is used instead.
+# This is just for test purposes
+
 rule_files:
   - ./alerts.yaml
 
 tests:
   - interval: 1m
     input_series:
-      - series: 'settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}'
+      # provider 1 traffic flowing through pod a
+      - series: 'settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1", pod="a"}'
         # remember that axb is a shorthand for a+0xb, so it's a four times.
         # _xb is _ b times, as you cannot increment missing scrapes 
         # remember that _ becomes effective after five consecutive _ 
         # 1 1 1 _ _ _ _ _ _ 1 4 7 10  
-        values: '1x2 _x6 1+3x3'
+        values: '1x2 _x6 1+3x3' # simulates low/inconsistent traffic
+      
+      # provider 1 traffic flowing through pod b
+      - series: 'settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1", pod="b"}'
+        values: '_x10' # simulates no traffic
+      
+      # provider 2 traffic flowing through pod a
+      - series: 'settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider2", pod="a"}'
+        # 5 8 11 14 17 20 1 1 1 1 1 1  
+        values: '5+3x5 1x5' # simulate high/consistent traffic
+
     promql_expr_test:
-      - expr: 'settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}'
+      # first bunch of tests to make sure I really understood the Prom notation for time series...
+      - expr: 'settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1", pod="a"}'
         eval_time: 0m
         exp_samples:
           - value: 1
-            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
-      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1", pod="a"}
+      - expr: 'settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1", pod="b"}'
+        eval_time: 0m
+        exp_samples: []
+      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1", pod="a"}
         eval_time: 1m
         exp_samples:
           - value: 1
-            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
-      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1", pod="a"}
+      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1", pod="a"}
         eval_time: 2m
         exp_samples:
           - value: 1
-            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
-      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1", pod="a"}
+      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1", pod="a"}
         eval_time: 3m
         #at minute 3, the value is still 1 because _ is not effective yet. we need 5 consecutive _ to make it effective
         exp_samples:
           - value: 1
-            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
-      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
-        eval_time: 5m
-        #at minute 3, the value is still 1 because _ is not effective yet. we need 5 consecutive _ to make it effective
+            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1", pod="a"}
+      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider2", pod="a"}
+        eval_time: 4m
         exp_samples:
-          - value: 1
-            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
-      - expr: 'sum by (provider) (rate(settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers"}[1m]))'
-        eval_time: 3m
-        exp_samples:
-          - value: 1
-            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
-      - expr: 'sum by (provider) (rate(settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers"}[3m]))'
-        eval_time: 5m
-        exp_samples:
-          - value: 1
-            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
-      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+          - value: 17
+            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider2", pod="a"}
+      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1", pod="a"}
         eval_time: 7m
         #at minute 7, the value is still 1 because _ is not effective yet. we need 5 consecutive _ to make it effective
         exp_samples:
           - value: 1
-            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
-      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1", pod="a"}
+      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1", pod="a"}
         eval_time: 8m
         exp_samples: []
-      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1", pod="a"}
         eval_time: 9m
         exp_samples:
           - value: 1
-            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
-      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1", pod="a"}
+      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1", pod="a"}
         eval_time: 12m
         exp_samples:
           - value: 10
-            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}
+            labels: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1", pod="a"}
+      - expr: settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1", pod="b"}
+        eval_time: 12m
+        exp_samples: []
+      
+      # below tests are meant to check the values that prom computes when using the expected expressions
 
-    # alert_rule_test:
-    #   - eval_time: 0m
-    #     alertname: TransactionSettlementNoOutboundSettledProcessed
-    #     exp_alerts:
-    #     # No errors are expected at this stage. we can see some traffic
-    #   - eval_time: 2m
-    #     alertname: TransactionSettlementNoOutboundSettledProcessed
-    #     exp_alerts:
-    #     # No errors are expected at this stage. we can see some traffic
-    #   - eval_time: 7m
-    #     alertname: TransactionSettlementNoOutboundSettledProcessed
-    #     exp_alerts:
-    #     # No errors are expected at this stage. we can see some traffic
-    #   - eval_time: 8m
-    #     alertname: TransactionSettlementNoOutboundSettledProcessed
-    #     exp_alerts:
-    #     # No errors are expected at this stage. we can see some traffic
-    #   - eval_time: 11m
-    #     alertname: TransactionSettlementNoOutboundSettledProcessed
-    #     exp_alerts:
-    #     # No errors are expected at this stage. we can see some traffic
+      # Minute 0
+      - expr: sum (rate(settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}[3m]))
+        eval_time: 0m
+        exp_samples: []
+      - expr: absent_over_time(settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}[3m])
+        eval_time: 0m
+        # value is present
+        exp_samples: [] 
+      - expr: |
+          sum (rate(settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}[3m])) == 0
+          or absent_over_time(settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}[3m])
+        eval_time: 0m
+        # There is some traffic. This should return empty
+        exp_samples: []
+
+      # Minute 3
+      - expr: sum (rate(settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}[3m]))
+        eval_time: 3m
+        exp_samples:
+          - value: 0
+      - expr: absent_over_time(settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}[3m])
+        eval_time: 3m
+        # value is present
+        exp_samples: [] 
+      - expr: |
+          sum (rate(settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}[3m])) == 0
+          or absent_over_time(settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}[3m])
+        eval_time: 3m
+        # Latency is 0, alert should fire here
+        exp_samples:
+          - value: 0
+
+      # Minute 6
+      - expr: sum (rate(settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}[3m]))
+        eval_time: 6m
+        # missing scrapes, rate should return empty
+        exp_samples: []
+      - expr: absent_over_time(settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}[3m])
+        eval_time: 6m
+        # value is absent, so 1 is returned!
+        exp_samples:
+          - value: 1
+            labels: '{app="transaction-settlement-consumers", provider="provider1"}'
+      - expr: |
+          sum (rate(settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}[3m])) == 0
+          or absent_over_time(settlement_time_duration_seconds_bucket{app="transaction-settlement-consumers", provider="provider1"}[3m])
+        eval_time: 6m
+        # Latency is 0, alert should fire here
+        exp_samples:
+          - value: 1
+            labels: '{app="transaction-settlement-consumers", provider="provider1"}'
+      
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: TransactionSettlementNoOutboundSettledProcessed
+        exp_alerts:
+        # No errors are expected at this stage. we can see some traffic
+      - eval_time: 3m
+        alertname: TransactionSettlementNoOutboundSettledProcessed
+        exp_alerts:
+        # This should fire as the computed traffic is 0
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: "No `settled` events have been received for **outbound** transactions in the last 3 minutes"
+              description: >
+                No `settled` events have been received for **outbound** transactions in the last 3 minutes for `provider1`.
+              runbook_url: "https://your-oncall-docs.com/no-traffic"
+      - eval_time: 6m
+        alertname: TransactionSettlementNoOutboundSettledProcessed
+        exp_alerts:
+        # This should fire as there's no scrape
+          - exp_labels:
+              severity: critical
+              # unclear why we have this 2 extra labels here
+              app: transaction-settlement-consumers
+              provider: provider1
+            exp_annotations:
+              summary: "No `settled` events have been received for **outbound** transactions in the last 3 minutes"
+              description: >
+                No `settled` events have been received for **outbound** transactions in the last 3 minutes for `provider1`.
+              runbook_url: "https://your-oncall-docs.com/no-traffic"
